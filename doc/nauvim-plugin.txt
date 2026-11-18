@@ -1,0 +1,234 @@
+*nauvim-plugin.txt*  Host-side Lua interface to Nauvim
+
+==============================================================================
+CONTENTS                                               *nauvim-plugin*
+
+  Installation                |nauvim-plugin-install|
+  Calls and errors             |nauvim-plugin-calls|
+  Local forwarding             |nauvim-plugin-local-forward|
+  Filesystem                   |nauvim-plugin-filesystem|
+  HTTP and GUI previews        |nauvim-plugin-http|
+  Clipboard                    |nauvim-plugin-clipboard|
+  Client and destination       |nauvim-plugin-client|
+
+==============================================================================
+INSTALLATION                                           *nauvim-plugin-install*
+
+Requires Neovim v0.12.6. Use the latest nauvim-core and nauvim-plugin together.
+Install this repository with a plugin manager, or add it to 'runtimepath': >lua
+
+    vim.opt.runtimepath:prepend("/absolute/path/to/nauvim-plugin")
+<
+The root require exposes client, filesystem, http, clipboard and ["local-forward"]:
+>lua
+    local nauvim = require("nauvim-plugin")
+    local forward = nauvim["local-forward"]
+<
+Nauvim registers itself automatically. Users do not need to call setup().
+
+==============================================================================
+CALLS AND ERRORS                                        *nauvim-plugin-calls*
+
+Each operation takes one dictionary with the fields shown below. nauvim-core
+validates operation arguments. The plugin supplies its registered client ID
+when sending each operation; client_id is not an operation input field.
+
+The plugin checks non-nil request results as finite integer resource handles or
+assigned ports in 1..65535. A malformed result produces nil, err. The plugin does
+not validate input types, ranges or string contents.
+
+Requests return ret, err. Test err == nil to determine whether a request error
+occurred. Errors are nonempty strings, returned rather than raised. A nil result
+with no error is valid, including when a pending get_port() is cancelled.
+
+Notifications return nil and have no response. clear() and clipboard.copy()
+ignore send failures. client.connect() displays a send failure and does not
+detach in that case.
+
+Without a selected RPC destination, requests, notifications and clipboard copy
+callbacks do nothing. Requests return nil, nil; other calls return nil. Calls
+do not wait for registration and are not replayed later. Clipboard paste
+callbacks always supply no text, regardless of the selected destination.
+
+Strings must be valid UTF-8 without NUL or BOM anywhere in the string. This also
+applies to nested data, clipboard contents and returned errors. The core validates
+RPC arguments; the plugin validates RPC-request return values.
+
+Resource handles identify asynchronous work and its associated client resources.
+Receiving a handle does not establish that work has completed or succeeded.
+Later failures are displayed in the client according to the operation's rules.
+get_port() waits for binding and returns its outcome, including binding errors.
+
+Handles address resources in the currently selected client. Handles can be reused;
+an old value addresses whatever resource currently has that value. No additional
+session-of-creation check is made. Detachment cleans up attachment resources.
+
+Client paths (client_file and client_socket_path) use Nauvim's process temporary
+directory as their base. The core removes leading slashes and resolves paths and
+symlinks. It accepts only strict descendants of that directory. The directory
+itself and paths outside it are rejected. Client paths use POSIX semantics and
+are not URL-decoded. The plugin passes their strings unchanged to the client.
+
+Relative host_file and host_socket_path values use the effective host Neovim
+current directory at the time of the call, including :lcd and :tcd. They are
+expanded with fnamemodify(path, ':p') before transmission. Symlink targets are
+resolved by host-side filesystem operations.
+
+==============================================================================
+LOCAL FORWARDING                                        *nauvim-plugin-local-forward*
+
+Use require("nauvim-plugin.local-forward").
+
+open_tcp({ client_port = int, host_addr = string, host_port = int }) -> ret, err
+    Requests a forward from client IPv4 loopback (127.0.0.1) to the destination
+    reached from the host environment. client_port is 0..65535; zero requests
+    an available port. host_port is 1..65535. ret is a resource handle.
+
+open_socket({ client_socket_path = string, host_socket_path = string }) -> ret, err
+    Requests a Unix domain socket forward. The client path is confined to the
+    process temporary directory. The host path follows the host path rules
+    above. ret is a resource handle.
+
+get_port({ handle = int }) -> ret, err
+    Waits for TCP binding and returns the assigned client port. A socket-forward
+    handle or an unknown handle produces a request error. Clearing a pending
+    forward completes a waiting call with nil, nil.
+
+clear({ handle = int })
+    Sends a notification to cancel pending binding or close the listener. A
+    created client socket pathname is removed. Unknown handles have no effect.
+    Whether already accepted streams are closed by clear() is unspecified.
+
+Binding and forwarding failures are client errors. open_tcp() and open_socket()
+do not report asynchronous binding failures through err. get_port() reports a
+binding failure, including one already displayed in the client.
+
+==============================================================================
+FILESYSTEM                                             *nauvim-plugin-filesystem*
+
+Use require("nauvim-plugin.filesystem").
+
+copy({ client_file = string, host_file = string, override = bool }) -> ret, err
+    Requests an asynchronous host-to-client copy. ret is a resource handle.
+    Source symlinks are resolved. Regular files and directories are copied;
+    other source types are ignored. Directories are copied recursively.
+
+    An existing destination of the same type is preserved when override is
+    false. With override true, files are overwritten and directories are deleted
+    before recursive copying. A mismatched destination type or an existing
+    destination symlink is a client error regardless of override.
+
+    Client-path validation errors are request errors. Copy and filesystem I/O
+    failures are displayed in the client; they do not make copy() return err.
+
+clear({ handle = int })
+    Sends a notification to stop or cancel copying before deleting its client
+    destination, including partial output. A pre-existing destination preserved
+    because override was false remains unchanged. Unknown handles have no effect.
+    A deletion failure ends that deletion attempt without retrying it.
+
+Detachment applies the same destination preservation rules after stopping copy
+work. Distinct copies or cleanup operations with identical destinations or
+ancestor/descendant destinations have undefined behaviour.
+
+==============================================================================
+HTTP AND GUI PREVIEWS                                   *nauvim-plugin-http*
+
+Use require("nauvim-plugin.http").
+
+serve_file({ client_file = string, client_port = int, https = bool,
+             http2 = bool }) -> ret, err
+    Requests an asynchronous server on 127.0.0.1. The client path must name an
+    existing regular file or directory, including a symlink resolving to one.
+    client_port is 0..65535; zero requests an available port. ret is a handle.
+
+    At least one of https and http2 must be true. https selects TLS with a
+    self-signed certificate. http2 true selects HTTP/2 only; false selects
+    HTTP/1.1 only. Validation failures are request errors. Startup failures are
+    displayed in the client and can be queried with get_port().
+
+get_port({ handle = int }) -> ret, err
+    Waits for binding and returns the assigned server port or a binding error.
+    Unknown handles and handles for other resource types produce request errors.
+    Clearing pending startup completes a waiting call with nil, nil.
+
+open_webview({ url = string, position = { grid = int, top = int, left = int,
+                                        height = int, width = int } }) -> ret, err
+    Requests an asynchronous GUI window accessing an HTTP(S) URL, including a
+    fragment identifier. URL resolution occurs in the client environment.
+    position uses cells in the specified Neovim UI grid; top and left start at
+    zero and increase downwards and rightwards. top, left, height and width must
+    each be integers in 0..65535. Other URL schemes produce a request error.
+
+    ret is a handle, including for a nonexistent grid, which has no effect.
+    For an existing grid the position must fit within that grid; behaviour for
+    an out-of-grid position is undefined. The presentation component accepts
+    self-signed certificates from serve_file(). GUI creation and access failures
+    are displayed in the client.
+
+clear({ handle = int })
+    Sends a notification to cancel pending server startup or close an existing
+    server or GUI window. Unknown handles have no effect. A GUI window request
+    whose window does not yet exist is unaffected.
+
+==============================================================================
+CLIPBOARD                                              *nauvim-plugin-clipboard*
+
+Assign the provider before Neovim initializes clipboard integration: >lua
+
+    vim.g.clipboard = require("nauvim-plugin.clipboard").provider
+<
+The provider copies both '+' and '*' to the client system clipboard. It needs
+no external host program and does not cache clipboard data. The client's
+configured clipboard backend determines availability. Backend errors are
+reported in the client.
+
+For direct copying, require("nauvim-plugin.clipboard") exposes:
+
+copy({ register = string, text = string })
+    Sends a notification to copy text. register is '+' or '*'. text is a single
+    string with LF line separators and an optional trailing LF. The function
+    returns nil without waiting for the backend operation to complete.
+
+The Neovim copy callbacks take (lines, regtype) and join the lines with LF.
+A trailing empty line preserves a trailing LF. Without a selected destination,
+copy() and the copy callbacks return nil without sending anything.
+
+Clipboard-register reads supply no text. Both provider paste callbacks take no
+arguments, return a fresh { {}, "v" } pair and issue no RPC. This behaviour is
+the same with or without a selected destination.
+
+GUI paste follows a separate flow: nauvim-core obtains text from the client
+clipboard backend and sends it to the host Neovim with |nvim_paste()| or an
+equivalent paste-input operation. It does not read text through these provider
+callbacks. See also |provider-clipboard| and |provider-paste|.
+
+==============================================================================
+CLIENT AND DESTINATION                                  *nauvim-plugin-client*
+
+Use require("nauvim-plugin.client").
+
+connect({ host = string })
+    Sends the host alias to the selected client, then immediately executes
+    :detach. It does not wait for an acknowledgment. Nauvim handles the welcome
+    page and new connection. If sending fails, an error is displayed without
+    detaching, retrying or changing the stored destination.
+
+setup({ client_id = int })
+    Internal entry point used by Nauvim after UI attachment. The ID is an
+    unsigned 32-bit integer. Only attached UIs advertising client.name equal to
+    'nauvim-client-{client_id}' can be selected. The decimal ID has no leading
+    zeros. If several match, one is selected.
+
+    Successful setup replaces the single stored channel/client-ID pair without
+    detaching any UI. Failure clears both identifiers and returns silently.
+    UILeave clears both only when v:event.chan equals the selected channel.
+
+    Channel liveness is not checked before sending. A stale channel uses ordinary
+    RPC error handling and remains selected unless setup() or UILeave changes it.
+
+The available operations depend on nauvim-core's enabled features and policies.
+An unavailable request is an ordinary request error. Client registration and
+session switching are always included in nauvim-core.
+
+vim:tw=78:ts=8:noet:ft=help:norl:
