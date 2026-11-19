@@ -1,9 +1,12 @@
 # nauvim-plugin
 
-The host-side Lua interface to Nauvim. Neovim plugins use it to request client-side
+The host-side Lua interface to Nauvim. Nauvim plugins use it to request client-side
 forwarding, temporary file copies, HTTP previews, clipboard copying and session
 switches. It requires Neovim **v0.12.6**, with no other host dependencies. Use the
 latest versions of both `nauvim-plugin` and `nauvim-core` together.
+
+This implementation targets `nauvim-spec` commit
+[`e65f68cba1fb5c42996ba0370f5a1b86537b6142`](https://github.com/nauvim/nauvim-spec/tree/e65f68cba1fb5c42996ba0370f5a1b86537b6142).
 
 ## Install
 
