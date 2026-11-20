@@ -6,7 +6,7 @@ switches. It requires Neovim **v0.12.6**, with no other host dependencies. Use t
 latest versions of both `nauvim-plugin` and `nauvim-core` together.
 
 This implementation targets `nauvim-spec` commit
-[`e65f68cba1fb5c42996ba0370f5a1b86537b6142`](https://github.com/nauvim/nauvim-spec/tree/e65f68cba1fb5c42996ba0370f5a1b86537b6142).
+[`8e23c1cd5705cc4f06e8a0acbb567ab27c3bb0f3`](https://github.com/nauvim/nauvim-spec/tree/8e23c1cd5705cc4f06e8a0acbb567ab27c3bb0f3).
 
 For releases with Git tags, a change to the referenced `nauvim-spec` commit hash
 requires a minor or major version increase. If the hash stays the same, the patch
