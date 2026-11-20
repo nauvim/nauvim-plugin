@@ -8,6 +8,13 @@ latest versions of both `nauvim-plugin` and `nauvim-core` together.
 This implementation targets `nauvim-spec` commit
 [`e65f68cba1fb5c42996ba0370f5a1b86537b6142`](https://github.com/nauvim/nauvim-spec/tree/e65f68cba1fb5c42996ba0370f5a1b86537b6142).
 
+For releases with Git tags, a change to the referenced `nauvim-spec` commit hash
+requires a minor or major version increase. If the hash stays the same, the patch
+version increases. Breaking changes or other release requirements may require
+exceptions to these rules. In all cases, tagged releases with the same minor
+version are guaranteed to reference the same `nauvim-spec` commit hash. There is
+no guarantee that every release receives a Git tag.
+
 ## Install
 
 Install this repository with a Neovim plugin manager or add the checkout to your
