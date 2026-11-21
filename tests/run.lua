@@ -8,8 +8,12 @@ local ui_leave, response, request_failure, notification_failure
 local request_throws, notification_throws, list_failure, info_failure = false, false, false, false
 local notify_result, list_reads, info_reads = nil, 0, 0
 
+local function pack(...)
+  return { n = select("#", ...), ... }
+end
+
 local function record(kind, channel, method, ...)
-  calls[#calls + 1] = { kind, channel, method, { n = select("#", ...), ... } }
+  calls[#calls + 1] = { kind, channel, method, pack(...) }
 end
 
 local function detach()
@@ -68,12 +72,6 @@ end
 
 local function error_string(err)
   assert(type(err) == "string" and #err > 0, "expected a nonempty error string")
-  assert(not err:find("\0", 1, true), "error contains NUL")
-  assert(not err:find("\239\187\191", 1, true), "error contains BOM")
-  -- Every deliberately malformed error used below is replaced by readable text.
-  for _, byte in ipairs({ "\192", "\193", "\245", "\255" }) do
-    assert(not err:find(byte, 1, true), "error contains invalid UTF-8")
-  end
 end
 
 local function setup(id, channel)
@@ -107,11 +105,9 @@ local function no_destination()
   local explosive = setmetatable({}, { __index = function() error("input was inspected") end })
   for _, f in ipairs(requests) do
     for _, opts in ipairs({ false, explosive }) do
-      local ret, err = f(opts)
-      eq(nil, ret); eq(nil, err)
+      eq({ n = 2 }, pack(f(opts)))
     end
-    local ret, err = f()
-    eq(nil, ret); eq(nil, err)
+    eq({ n = 2 }, pack(f()))
   end
   for _, f in ipairs(notifications) do
     eq(nil, f(explosive)); eq(nil, f())
@@ -138,8 +134,12 @@ local request_cases = {
   { forward.get_port, { handle = 7 }, "local-forward.get_port", { n = 2, 4294967295, 7 }, 12345 },
   { filesystem.copy, { client_file = "/preview", host_file = "/host/日本語", override = false },
     "filesystem.copy", { n = 4, 4294967295, "/preview", "/host/日本語", false }, 81 },
-  { http.serve_file, { client_file = "preview", client_port = 0, https = false, http2 = true },
-    "http.serve_file", { n = 5, 4294967295, "preview", 0, false, true }, 82 },
+  { http.serve_file, { client_file = "preview", client_port = 0, https = false, http2 = false },
+    "http.serve_file", { n = 5, 4294967295, "preview", 0, false, false }, 82 },
+  { http.serve_file, { client_file = "preview", client_port = 0, https = true, http2 = false },
+    "http.serve_file", { n = 5, 4294967295, "preview", 0, true, false }, 82 },
+  { http.serve_file, { client_file = "preview", client_port = 0, https = true, http2 = true },
+    "http.serve_file", { n = 5, 4294967295, "preview", 0, true, true }, 82 },
   { http.get_port, { handle = 8 }, "http.get_port", { n = 2, 4294967295, 8 }, 23456 },
   { http.open_webview, { url = "https://localhost/#fragment", position = position },
     "http.open_webview", { n = 3, 4294967295, "https://localhost/#fragment", position }, 83 },
@@ -150,58 +150,58 @@ local before_lists, before_infos = list_reads, info_reads
 for _, case in ipairs(request_cases) do
   calls, response = {}, case[5]
   local opts_before = real_vim.deepcopy(case[2])
-  local ret, err = case[1](case[2])
-  eq(case[5], ret); eq(nil, err)
+  eq({ n = 2, case[5] }, pack(case[1](case[2])))
   eq(opts_before, case[2])
   eq({ { "request", 22, "nauvim-plugin/" .. case[3], case[4] } }, calls)
 end
 eq(before_lists, list_reads); eq(before_infos, info_reads)
 
--- Validate received values by result contract, including cancellation results.
+-- Core rejects plain HTTP/2 before startup. The plugin forwards it and returns
+-- the request error as the second Lua result.
+calls, request_throws, request_failure = {}, true, "HTTP/2 requires HTTPS"
+eq({ n = 2, [2] = request_failure }, pack(http.serve_file({
+  client_file = "preview", client_port = 0, https = false, http2 = true,
+})))
+eq({ { "request", 22, "nauvim-plugin/http.serve_file", { n = 5, 4294967295, "preview", 0, false, true } } }, calls)
+request_throws = false
+
+-- No-effect and cancellation replies preserve both Lua return slots.
 for _, case in ipairs(request_cases) do
   response = real_vim.NIL
-  local ret, err = case[1](case[2])
-  eq(nil, ret); eq(nil, err)
+  eq({ n = 2 }, pack(case[1](case[2])))
   response = nil
-  ret, err = case[1](case[2])
-  eq(nil, ret); eq(nil, err)
-  for _, value in ipairs({ false, "79", {}, 0.5, math.huge, -math.huge, 0 / 0 }) do
-    response = value
-    ret, err = case[1](case[2])
-    eq(nil, ret); error_string(err)
-  end
+  eq({ n = 2 }, pack(case[1](case[2])))
 end
 for _, f in ipairs({ forward.get_port, http.get_port }) do
-  for _, value in ipairs({ -1, 0, 65536 }) do
-    response = value
-    local ret, err = f({ handle = 1 })
-    eq(nil, ret); error_string(err)
-  end
   for _, value in ipairs({ 1, 65535 }) do
     response = value
-    local ret, err = f({ handle = 1 })
-    eq(value, ret); eq(nil, err)
+    eq({ n = 2, value }, pack(f({ handle = 1 })))
   end
 end
-for _, case in ipairs({ request_cases[1], request_cases[2], request_cases[4], request_cases[5], request_cases[7] }) do
-  for _, value in ipairs({ -1, 0 }) do
-    response = value
-    local ret, err = case[1](case[2])
-    eq(value, ret); eq(nil, err)
+for _, case in ipairs(request_cases) do
+  if case[1] ~= forward.get_port and case[1] ~= http.get_port then
+    for _, value in ipairs({ -1, 0 }) do
+      response = value
+      eq({ n = 2, value }, pack(case[1](case[2])))
+    end
   end
 end
 
--- Exceptions are returned as nonempty, safe strings, including unusual errors.
-local ret, err
+-- Locally raised Lua errors need a nonempty message. RPC text rules apply to
+-- wire responses, so locally generated strings keep their original contents.
 request_throws = true
-for _, failure in ipairs({ "RPC failure", "", "\0", "\239\187\191", "\255", false,
-  setmetatable({}, { __tostring = function() return "custom RPC error" end }),
-  setmetatable({}, { __tostring = function() error("bad error formatter") end }),
+for _, case in ipairs({
+  { "RPC failure", "RPC failure" },
+  { "", "Nauvim RPC request failed" },
+  { "\0", "\0" },
+  { "\239\187\191", "\239\187\191" },
+  { "\255", "\255" },
+  { false, "false" },
+  { setmetatable({}, { __tostring = function() return "custom RPC error" end }), "custom RPC error" },
+  { setmetatable({}, { __tostring = function() error("bad error formatter") end }), "Nauvim RPC request failed" },
 }) do
-  request_failure = failure
-  ret, err = forward.get_port({ handle = 1 })
-  eq(nil, ret); error_string(err)
-  if failure == "RPC failure" then assert(err:find(failure, 1, true)) end
+  request_failure = case[1]
+  eq({ n = 2, [2] = case[2] }, pack(forward.get_port({ handle = 1 })))
 end
 request_throws = false
 
@@ -226,29 +226,22 @@ local passthrough_cases = {
 response = 84
 for _, case in ipairs(passthrough_cases) do
   calls = {}
-  ret, err = case[1](case[2])
-  eq(84, ret); eq(nil, err)
+  eq({ n = 2, 84 }, pack(case[1](case[2])))
   eq({ { "request", 22, "nauvim-plugin/" .. case[3], case[4] } }, calls)
 end
 
-local bad_strings = {
-  "prefix\0suffix", "prefix\239\187\191suffix", "\128", "\192\128", "\193\191",
+local passthrough_strings = {
+  "prefix\0suffix", "\239\187\191prefix", "prefix\239\187\191suffix", "\128", "\192\128", "\193\191",
   "\194", "\224\159\191", "\237\160\128", "\240\143\191\191",
   "\244\144\128\128", "\245\128\128\128", "\255",
 }
-for _, s in ipairs(bad_strings) do
+for _, s in ipairs(passthrough_strings) do
   calls, response = {}, 84
-  ret, err = forward.open_tcp({ client_port = 0, host_addr = s, host_port = 1 })
-  eq(84, ret); eq(nil, err)
+  eq({ n = 2, 84 }, pack(forward.open_tcp({ client_port = 0, host_addr = s, host_port = 1 })))
   eq({ { "request", 22, "nauvim-plugin/local-forward.open_tcp", { n = 4, 4294967295, 0, s, 1 } } }, calls)
   calls = {}
   eq(nil, clipboard.copy({ register = "invalid register", text = s }))
   eq({ { "notification", 22, "nauvim-plugin/clipboard.copy", { n = 3, 4294967295, "invalid register", s } } }, calls)
-  for _, value in ipairs({ s, { nested = { s } }, { [s] = "value" } }) do
-    response = value
-    ret, err = forward.get_port({ handle = 1 })
-    eq(nil, ret); error_string(err)
-  end
 end
 
 -- Host paths use the current window's local directory; client paths stay raw.
@@ -256,7 +249,7 @@ local cwd, temp = real_vim.fn.getcwd(), real_vim.fn.tempname()
 assert(real_vim.fn.mkdir(temp .. "/日本 語", "p") == 1)
 real_vim.cmd("lcd " .. real_vim.fn.fnameescape(temp .. "/日本 語"))
 calls, response = {}, 85
-ret, err = filesystem.copy({ client_file = "///preview/%2e%2e/file", host_file = "source.txt", override = true })
+local ret, err = filesystem.copy({ client_file = "///preview/%2e%2e/file", host_file = "source.txt", override = true })
 eq(85, ret); eq(nil, err)
 eq({ n = 4, 4294967295, "///preview/%2e%2e/file", temp .. "/日本 語/source.txt", true }, calls[1][4])
 calls = {}

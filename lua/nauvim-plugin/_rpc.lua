@@ -1,5 +1,3 @@
-local validate = require("nauvim-plugin._validate")
-
 local M = {}
 local channel, client_id
 
@@ -42,28 +40,21 @@ function M.setup(opts)
   end
 end
 
-local function request(chan, id, method, opts, encode, check)
-  local ret = vim.rpcrequest(chan, "nauvim-plugin/" .. method, id, encode(opts))
-  if ret == vim.NIL then
-    return nil
-  end
-  if ret ~= nil then
-    if check then
-      check(ret)
-    else
-      validate.integer(ret, "RPC handle result")
-    end
-  end
-  return ret
+local function request(chan, id, method, opts, encode)
+  return vim.rpcrequest(chan, "nauvim-plugin/" .. method, id, encode(opts))
 end
 
-function M.request(method, opts, encode, check)
+-- Return the components of the specification's (ret, err) tuple separately.
+function M.request(method, opts, encode)
   if not M.ready() then
     return nil, nil
   end
-  local ok, ret = pcall(request, channel, client_id, method, opts, encode, check)
+  local ok, ret = pcall(request, channel, client_id, method, opts, encode)
   if not ok then
     return nil, M.error_message(ret, "Nauvim RPC request failed")
+  end
+  if ret == vim.NIL then
+    ret = nil
   end
   return ret, nil
 end

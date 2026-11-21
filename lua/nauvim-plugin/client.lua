@@ -8,6 +8,7 @@ end
 
 --- Selects an attached Nauvim client. Called internally by nauvim-core.
 --- An unsuccessful selection quietly clears the previous destination.
+--- The client ID is an unsigned 32-bit integer (0..4294967295).
 ---@param opts { client_id: integer }
 function M.setup(opts)
   rpc.setup(opts)

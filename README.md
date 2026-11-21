@@ -6,7 +6,7 @@ switches. It requires Neovim **v0.12.6**, with no other host dependencies. Use t
 latest versions of both `nauvim-plugin` and `nauvim-core` together.
 
 This implementation targets `nauvim-spec` commit
-[`8e23c1cd5705cc4f06e8a0acbb567ab27c3bb0f3`](https://github.com/nauvim/nauvim-spec/tree/8e23c1cd5705cc4f06e8a0acbb567ab27c3bb0f3).
+[`cc51d1ecc51869d8eafb68f243cf0adff6f390bb`](https://github.com/nauvim/nauvim-spec/tree/cc51d1ecc51869d8eafb68f243cf0adff6f390bb).
 
 For releases with Git tags, a change to the referenced `nauvim-spec` commit hash
 requires a minor or major version increase. If the hash stays the same, the patch
@@ -68,11 +68,12 @@ elseif handle ~= nil then
 end
 ```
 
-All operation functions take one dictionary. Requests return `result, err`, with
-`err == nil` for no request error. A handle identifies asynchronous work; it does
-not indicate completion. Notifications, including `clear()`, `clipboard.copy()`
-and `client.connect()`, return `nil`. `nauvim-core` validates operation arguments;
-the plugin validates RPC-request return values.
+All operation functions take one dictionary. Lua requests return two separate
+values, `ret, err`. Check `err == nil` for the absence of a request error. A
+handle identifies asynchronous work that may still be in progress. Notifications,
+including `clear()`, `clipboard.copy()` and `client.connect()`, return `nil`.
+`nauvim-core` validates operation arguments and ensures its RPC responses conform
+to the specification.
 
 The root module also exposes each interface:
 
