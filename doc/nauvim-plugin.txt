@@ -30,16 +30,15 @@ Nauvim registers itself automatically. Users do not need to call setup().
 CALLS AND ERRORS                                        *nauvim-plugin-calls*
 
 Each operation takes one dictionary with the fields shown below. nauvim-core
-validates operation arguments. The plugin supplies its registered client ID
-when sending each operation; client_id is not an operation input field.
+validates operation arguments and ensures its RPC responses conform to the
+specification. The plugin sends the stored client ID followed by the operation
+fields as positional RPC arguments.
 
-The plugin checks non-nil request results as finite integer resource handles or
-assigned ports in 1..65535. A malformed result produces nil, err. The plugin does
-not validate input types, ranges or string contents.
-
-Requests return ret, err. Test err == nil to determine whether a request error
-occurred. Errors are nonempty strings, returned rather than raised. A nil result
-with no error is valid, including when a pending get_port() is cancelled.
+In a request signature, (ret, err) denotes a tuple of two results. Lua returns
+them as two separate values in that order, as in `local ret, err = get_port(opts)`.
+Test err == nil for the absence of a request error. Request errors are returned
+as nonempty strings. A nil result with no error is valid, including when a
+pending get_port() is cancelled.
 
 Notifications return nil and have no response. clear() and clipboard.copy()
 ignore send failures. client.connect() displays a send failure and does not
@@ -50,9 +49,18 @@ callbacks do nothing. Requests return nil, nil; other calls return nil. Calls
 do not wait for registration and are not replayed later. Clipboard paste
 callbacks always supply no text, regardless of the selected destination.
 
-Strings must be valid UTF-8 without NUL or BOM anywhere in the string. This also
-applies to nested data, clipboard contents and returned errors. The core validates
-RPC arguments; the plugin validates RPC-request return values.
+Types in the signatures use the shared specification notation. `bool` means a
+Boolean and `int` means an integer. The unsigned types `u16` and `u32` specify
+the ranges 0..65535 and 0..4294967295. Lua represents these with ordinary
+numbers. Braces describe dictionary fields. `list[T]` describes a sequence,
+`dict[K, V]` describes a map, and `func(T) -> U` describes a function.
+`T | U` accepts either type, with repeated alternatives counting once.
+`"+" | "*"` accepts only the two quoted values.
+
+Every RPC `string` must be valid UTF-8 without NUL or an initial U+FEFF.
+U+FEFF is allowed elsewhere in the string. This applies to nested keys and
+values, clipboard text and errors in RPC responses. The separate `bytes` type
+can carry arbitrary byte sequences.
 
 Resource handles identify asynchronous work and its associated client resources.
 Receiving a handle does not establish that work has completed or succeeded.
@@ -79,22 +87,23 @@ LOCAL FORWARDING                                        *nauvim-plugin-local-for
 
 Use require("nauvim-plugin.local-forward").
 
-open_tcp({ client_port = int, host_addr = string, host_port = int }) -> ret, err
+open_tcp({ client_port: u16, host_addr: string, host_port: u16 }) -> (ret, err)
     Requests a forward from client IPv4 loopback (127.0.0.1) to the destination
     reached from the host environment. client_port is 0..65535; zero requests
     an available port. host_port is 1..65535. ret is a resource handle.
 
-open_socket({ client_socket_path = string, host_socket_path = string }) -> ret, err
+open_socket({ client_socket_path: string, host_socket_path: string })
+    -> (ret, err)
     Requests a Unix domain socket forward. The client path is confined to the
     process temporary directory. The host path follows the host path rules
     above. ret is a resource handle.
 
-get_port({ handle = int }) -> ret, err
-    Waits for TCP binding and returns the assigned client port. A socket-forward
-    handle or an unknown handle produces a request error. Clearing a pending
-    forward completes a waiting call with nil, nil.
+get_port({ handle: int }) -> (ret, err)
+    Waits for TCP binding and returns the assigned client port (1..65535). A
+    socket-forward handle or an unknown handle produces a request error.
+    Clearing a pending forward completes a waiting call with nil, nil.
 
-clear({ handle = int })
+clear({ handle: int })
     Sends a notification to cancel pending binding or close the listener. A
     created client socket pathname is removed. Unknown handles have no effect.
     Whether already accepted streams are closed by clear() is unspecified.
@@ -108,7 +117,7 @@ FILESYSTEM                                             *nauvim-plugin-filesystem
 
 Use require("nauvim-plugin.filesystem").
 
-copy({ client_file = string, host_file = string, override = bool }) -> ret, err
+copy({ client_file: string, host_file: string, override: bool }) -> (ret, err)
     Requests an asynchronous host-to-client copy. ret is a resource handle.
     Source symlinks are resolved. Regular files and directories are copied;
     other source types are ignored. Directories are copied recursively.
@@ -121,7 +130,7 @@ copy({ client_file = string, host_file = string, override = bool }) -> ret, err
     Client-path validation errors are request errors. Copy and filesystem I/O
     failures are displayed in the client; they do not make copy() return err.
 
-clear({ handle = int })
+clear({ handle: int })
     Sends a notification to stop or cancel copying before deleting its client
     destination, including partial output. A pre-existing destination preserved
     because override was false remains unchanged. Unknown handles have no effect.
@@ -136,24 +145,25 @@ HTTP AND GUI PREVIEWS                                   *nauvim-plugin-http*
 
 Use require("nauvim-plugin.http").
 
-serve_file({ client_file = string, client_port = int, https = bool,
-             http2 = bool }) -> ret, err
+serve_file({ client_file: string, client_port: u16, https: bool, http2: bool })
+    -> (ret, err)
     Requests an asynchronous server on 127.0.0.1. The client path must name an
     existing regular file or directory, including a symlink resolving to one.
     client_port is 0..65535; zero requests an available port. ret is a handle.
 
-    At least one of https and http2 must be true. https selects TLS with a
-    self-signed certificate. http2 true selects HTTP/2 only; false selects
-    HTTP/1.1 only. Validation failures are request errors. Startup failures are
-    displayed in the client and can be queried with get_port().
+    With http2 = false, the server uses HTTP/1.1 over plain HTTP or HTTPS. With
+    http2 = true, it uses HTTP/2 and requires https = true. Core returns a
+    request error for plain HTTP/2 before starting the server. HTTPS uses TLS
+    with a self-signed certificate. Startup failures are displayed in the
+    client and can be queried with get_port().
 
-get_port({ handle = int }) -> ret, err
-    Waits for binding and returns the assigned server port or a binding error.
-    Unknown handles and handles for other resource types produce request errors.
-    Clearing pending startup completes a waiting call with nil, nil.
+get_port({ handle: int }) -> (ret, err)
+    Waits for binding and returns the assigned server port (1..65535) or a
+    binding error. Unknown handles and handles for other resource types produce
+    request errors. Clearing pending startup completes a call with nil, nil.
 
-open_webview({ url = string, position = { grid = int, top = int, left = int,
-                                        height = int, width = int } }) -> ret, err
+open_webview({ url: string, position: { grid: int, top: u16, left: u16,
+                                      height: u16, width: u16 } }) -> (ret, err)
     Requests an asynchronous GUI window accessing an HTTP(S) URL, including a
     fragment identifier. URL resolution occurs in the client environment.
     position uses cells in the specified Neovim UI grid; top and left start at
@@ -166,7 +176,7 @@ open_webview({ url = string, position = { grid = int, top = int, left = int,
     self-signed certificates from serve_file(). GUI creation and access failures
     are displayed in the client.
 
-clear({ handle = int })
+clear({ handle: int })
     Sends a notification to cancel pending server startup or close an existing
     server or GUI window. Unknown handles have no effect. A GUI window request
     whose window does not yet exist is unaffected.
@@ -185,7 +195,7 @@ reported in the client.
 
 For direct copying, require("nauvim-plugin.clipboard") exposes:
 
-copy({ register = string, text = string })
+copy({ register: "+" | "*", text: string })
     Sends a notification to copy text. register is '+' or '*'. text is a single
     string with LF line separators and an optional trailing LF. The function
     returns nil without waiting for the backend operation to complete.
@@ -208,13 +218,13 @@ CLIENT AND DESTINATION                                  *nauvim-plugin-client*
 
 Use require("nauvim-plugin.client").
 
-connect({ host = string })
+connect({ host: string })
     Sends the host alias to the selected client, then immediately executes
     :detach. It does not wait for an acknowledgment. Nauvim handles the welcome
     page and new connection. If sending fails, an error is displayed without
     detaching, retrying or changing the stored destination.
 
-setup({ client_id = int })
+setup({ client_id: u32 })
     Internal entry point used by Nauvim after UI attachment. The ID is an
     unsigned 32-bit integer. Only attached UIs advertising client.name equal to
     'nauvim-client-{client_id}' can be selected. The decimal ID has no leading

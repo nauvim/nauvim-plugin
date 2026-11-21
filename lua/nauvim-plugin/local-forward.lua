@@ -1,12 +1,11 @@
 local rpc = require("nauvim-plugin._rpc")
-local validate = require("nauvim-plugin._validate")
 
 local M = {}
 
 ---@class NauvimTcpForwardOptions
----@field client_port integer Zero requests an operating-system-assigned port.
+---@field client_port integer Port in 0..65535. Zero requests a system-assigned port.
 ---@field host_addr string Address reached from the host environment.
----@field host_port integer
+---@field host_port integer Port in 1..65535.
 
 ---@class NauvimSocketForwardOptions
 ---@field client_socket_path string Path relative to Nauvim's process temporary directory.
@@ -45,12 +44,12 @@ function M.open_socket(opts)
   return rpc.request("local-forward.open_socket", opts, encode_socket)
 end
 
---- Waits for TCP binding and returns the assigned client port.
+--- Waits for TCP binding and returns the assigned client port (1..65535).
 ---@param opts { handle: integer }
 ---@return integer? port
 ---@return string? err
 function M.get_port(opts)
-  return rpc.request("local-forward.get_port", opts, encode_handle, validate.port)
+  return rpc.request("local-forward.get_port", opts, encode_handle)
 end
 
 --- Cancels a pending forward or closes an established forward.
