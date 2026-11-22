@@ -72,19 +72,20 @@ local function webview_rpc()
 
   result = 81
   for _, flags in ipairs({
-    { vim.NIL, vim.NIL },
-    { false, vim.NIL },
-    { vim.NIL, false },
-    { true, false },
-    { "invalid focus", 0 },
+    { vim.NIL, vim.NIL, vim.NIL },
+    { false, vim.NIL, true },
+    { vim.NIL, false, vim.NIL },
+    { true, false, false },
+    { "invalid focus", 0, "invalid close_on_blur" },
   }) do
     local opts = { url = url, position = position }
     if flags[1] ~= vim.NIL then opts.focus = flags[1] end
     if flags[2] ~= vim.NIL then opts.focusable = flags[2] end
+    if flags[3] ~= vim.NIL then opts.close_on_blur = flags[3] end
 
     messages = {}
     eq({ 2, 81, vim.NIL }, lua(open, opts))
-    eq({ { "request", "nauvim-plugin/http.open_webview", { 4294967295, url, position, flags[1], flags[2] } } }, messages)
+    eq({ { "request", "nauvim-plugin/http.open_webview", { 4294967295, url, position, flags[1], flags[2], flags[3] } } }, messages)
   end
 
   messages = {}
@@ -93,7 +94,7 @@ local function webview_rpc()
   eq(2, denied[1])
   eq(vim.NIL, denied[2])
   assert(type(denied[3]) == "string" and denied[3]:find(response_error, 1, true), vim.inspect(denied))
-  eq({ { "request", "nauvim-plugin/http.open_webview", { 4294967295, url, position, vim.NIL, vim.NIL } } }, messages)
+  eq({ { "request", "nauvim-plugin/http.open_webview", { 4294967295, url, position, vim.NIL, vim.NIL, vim.NIL } } }, messages)
   response_error = vim.NIL
 
   messages = {}
@@ -104,6 +105,18 @@ local function webview_rpc()
     return reply(require("nauvim-plugin.http").focus_webview({ handle = 81 }))
   ]]))
   eq({ { "notification", "nauvim-plugin/http.focus_webview", { 4294967295, 81 } } }, messages)
+
+  messages = {}
+  eq({ 1, true }, lua([[
+    local function reply(...)
+      return { select("#", ...), ... == nil }
+    end
+    return reply(require("nauvim-plugin.http").navigate_webview({
+      handle = 81, url = "https://example.com/preview#next", focus = false,
+    }))
+  ]]))
+  eq({ { "notification", "nauvim-plugin/http.navigate_webview",
+    { 4294967295, 81, "https://example.com/preview#next", vim.NIL, false } } }, messages)
 end
 
 local function empty_register_reads()
@@ -219,6 +232,7 @@ local ok, err = xpcall(function()
     local ret, err = http.open_webview(false)
     assert(ret == nil and err == nil)
     assert(http.focus_webview(false) == nil)
+    assert(http.navigate_webview(false) == nil)
   ]])
   eq({}, messages)
   eq(before, lua("return vim.api.nvim_exec2('messages', { output = true }).output"))

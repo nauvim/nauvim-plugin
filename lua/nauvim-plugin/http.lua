@@ -20,13 +20,24 @@ local M = {}
 ---@field position NauvimWebviewPosition
 ---@field focus? boolean Whether to focus the window when it opens. Defaults to true.
 ---@field focusable? boolean Whether the window can receive focus. Defaults to true.
+---@field close_on_blur? boolean Whether to close the window when it loses focus. Defaults to false.
+
+---@class NauvimWebviewNavigationOptions
+---@field handle integer Handle returned by http.open_webview().
+---@field url string HTTP(S) URL resolved in the client environment.
+---@field replace_history? boolean Whether to replace the current history entry. Defaults to false.
+---@field focus? boolean Whether to request focus on acceptance if the window is focusable. Defaults to false.
 
 local function encode_serve(opts)
   return opts.client_file, opts.client_port, opts.https, opts.http2
 end
 
 local function encode_webview(opts)
-  return opts.url, opts.position, opts.focus, opts.focusable
+  return opts.url, opts.position, opts.focus, opts.focusable, opts.close_on_blur
+end
+
+local function encode_navigation(opts)
+  return opts.handle, opts.url, opts.replace_history, opts.focus
 end
 
 local function encode_handle(opts)
@@ -62,6 +73,13 @@ end
 ---@param opts { handle: integer }
 function M.focus_webview(opts)
   rpc.notify("http.focus_webview", opts, encode_handle)
+  return nil
+end
+
+--- Requests navigation in an open Webview window.
+---@param opts NauvimWebviewNavigationOptions
+function M.navigate_webview(opts)
+  rpc.notify("http.navigate_webview", opts, encode_navigation)
   return nil
 end
 

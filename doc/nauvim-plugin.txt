@@ -44,7 +44,8 @@ returned as nonempty strings.  A `nil` result with no error is valid, such as
 when a pending `get_port()` is cancelled.
 
 Notifications return `nil` and have no RPC response.  `clear()`,
-`http.focus_webview()`, and `clipboard.copy()` ignore send failures.
+`http.focus_webview()`, `http.navigate_webview()`, and `clipboard.copy()`
+ignore send failures.
 `client.connect()` displays a send failure and keeps the UI attached.
 
 Without a selected RPC destination, requests, notifications and clipboard copy
@@ -256,6 +257,9 @@ open_webview({opts})			   *nauvim-plugin.http.open_webview()*
     The window receives focus when it opens if both focus flags are `true`.
     Setting `{focus}` to `true` and `{focusable}` to `false` is valid and
     skips automatic focus.  The meaning of focus depends on the UI.
+    A window with `{close_on_blur}` set closes as soon as it loses focus.
+    The presentation component can offer developer tools or a console.  Nauvim
+    opens the window with those tools hidden.
 
     The host policy must permit the URL's origin.  Nauvim also checks the
     origin of each top-level navigation and redirect.  It blocks any denied
@@ -275,6 +279,8 @@ open_webview({opts})			   *nauvim-plugin.http.open_webview()*
                   Defaults to `true`.
                 • {focusable} (`boolean?`) Allow the window to receive focus.
                   Defaults to `true`.
+                • {close_on_blur} (`boolean?`) Close on loss of focus.
+                  Defaults to `false`.
 
     Return (multiple): ~
       • (`integer?`) Window handle.
@@ -288,6 +294,26 @@ focus_webview({opts})			  *nauvim-plugin.http.focus_webview()*
 
     Parameters: ~
       • {opts}  (`table`) Table with a `{handle}` field (`integer`).
+
+    Return: ~
+      • (`nil`)
+
+navigate_webview({opts})               *nauvim-plugin.http.navigate_webview()*
+    Sends a notification to navigate a window opened by
+    |nauvim-plugin.http.open_webview()| to an HTTP(S) URL.  The opening
+    attachment's policy must allow the URL and each redirect.  A window
+    that is pending or unavailable produces a client error.  Nauvim
+    discards the navigation in that case.  The client reports navigation,
+    history replacement and focus failures.
+
+    Parameters: ~
+      • {opts}  (`table`) Navigation options.
+                • {handle} (`integer`) Open window handle.
+                • {url} (`string`) HTTP(S) URL.
+                • {replace_history} (`boolean?`) Replace the current entry.
+                  Defaults to `false`.
+                • {focus} (`boolean?`) Request focus when navigation is
+                  accepted if the window is focusable. Defaults to `false`.
 
     Return: ~
       • (`nil`)
