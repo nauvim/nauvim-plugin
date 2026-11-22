@@ -259,7 +259,8 @@ open_webview({opts})			   *nauvim-plugin.http.open_webview()*
 
     The host policy must permit the URL's origin.  Nauvim also checks the
     origin of each top-level navigation and redirect.  It blocks any denied
-    navigation and reports an error in the client.
+    navigation and reports an error in the client.  See
+    |nauvim-plugin-host-permissions|.
 
     Parameters: ~
       • {opts}  (`table`) Preview options.

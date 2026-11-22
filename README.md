@@ -5,8 +5,8 @@ forwarding, temporary file copies, HTTP previews, clipboard copying and session
 switches. It requires Neovim **v0.12.6**, with no other host dependencies. Use the
 latest versions of both `nauvim-plugin` and `nauvim-core` together.
 
-This implementation targets [`nauvim-spec v1.0.0`](https://github.com/nauvim/nauvim-spec/tree/v1.0.0)
-at commit [`a2df4855fb8eac24f4e020a1b647eb233f14adf0`](https://github.com/nauvim/nauvim-spec/commit/a2df4855fb8eac24f4e020a1b647eb233f14adf0).
+This implementation targets `nauvim-spec` v1.0.0 at commit
+[`a2df4855fb8eac24f4e020a1b647eb233f14adf0`](https://github.com/nauvim/nauvim-spec/tree/a2df4855fb8eac24f4e020a1b647eb233f14adf0).
 
 For releases with Git tags, a change to the referenced `nauvim-spec` commit hash
 requires a minor or major version increase. If the hash stays the same, the patch
