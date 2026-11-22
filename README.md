@@ -5,8 +5,8 @@ forwarding, temporary file copies, HTTP previews, clipboard copying and session
 switches. It requires Neovim **v0.12.6**, with no other host dependencies. Use the
 latest versions of both `nauvim-plugin` and `nauvim-core` together.
 
-This implementation targets `nauvim-spec` v1.0.0 at commit
-[`a2df4855fb8eac24f4e020a1b647eb233f14adf0`](https://github.com/nauvim/nauvim-spec/tree/a2df4855fb8eac24f4e020a1b647eb233f14adf0).
+This implementation targets `nauvim-spec` v1.0.1 at commit
+[`624accdb172d93f00c000169ad99a2fce1f68a30`](https://github.com/nauvim/nauvim-spec/tree/624accdb172d93f00c000169ad99a2fce1f68a30).
 
 For releases with Git tags, a change to the referenced `nauvim-spec` commit hash
 requires a minor or major version increase. If the hash stays the same, the patch
@@ -72,8 +72,8 @@ end
 All operation functions take one dictionary. Lua requests return two separate
 values, `ret, err`. Check `err == nil` for the absence of a request error. A
 handle identifies asynchronous work that may still be in progress. Notifications,
-including `clear()`, `http.focus_webview()`, `clipboard.copy()` and
-`client.connect()`, return `nil`.
+including `clear()`, `http.focus_webview()`, `http.navigate_webview()`,
+`clipboard.copy()` and `client.connect()`, return `nil`.
 `nauvim-core` validates operation arguments and ensures its RPC responses conform
 to the specification.
 
@@ -81,7 +81,7 @@ The selected host needs explicit permissions for file copies, HTTP serving,
 Webview origins, local forwarding and clipboard copies. Omitted permissions
 grant no access to those operations. A denied request returns `nil, err`.
 A denied notification reports an error in the Nauvim client and sends no RPC
-response. See the [host-specific security policies](https://github.com/nauvim/nauvim-spec/blob/v1.0.0/specification.md#host-specific-security-policies).
+response. See the [host-specific security policies](https://github.com/nauvim/nauvim-spec/blob/v1.0.1/specification.md#host-specific-security-policies).
 
 The root module also exposes each interface:
 

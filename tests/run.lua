@@ -89,7 +89,10 @@ local requests = {
   forward.open_tcp, forward.open_socket, forward.get_port, filesystem.copy,
   http.serve_file, http.get_port, http.open_webview,
 }
-local notifications = { forward.clear, filesystem.clear, http.clear, http.focus_webview, clipboard.copy, client.connect }
+local notifications = {
+  forward.clear, filesystem.clear, http.clear, http.focus_webview,
+  http.navigate_webview, clipboard.copy, client.connect,
+}
 
 local function empty_paste()
   for _, register in ipairs({ "+", "*" }) do
@@ -142,13 +145,17 @@ local request_cases = {
     "http.serve_file", { n = 5, 4294967295, "preview", 0, true, true }, 82 },
   { http.get_port, { handle = 8 }, "http.get_port", { n = 2, 4294967295, 8 }, 23456 },
   { http.open_webview, { url = "https://localhost/#fragment", position = position },
-    "http.open_webview", { n = 5, 4294967295, "https://localhost/#fragment", position }, 83 },
+    "http.open_webview", { n = 6, 4294967295, "https://localhost/#fragment", position }, 83 },
   { http.open_webview, { url = "https://localhost", position = position, focus = false },
-    "http.open_webview", { n = 5, 4294967295, "https://localhost", position, false }, 83 },
+    "http.open_webview", { n = 6, 4294967295, "https://localhost", position, false }, 83 },
   { http.open_webview, { url = "https://localhost", position = position, focusable = false },
-    "http.open_webview", { n = 5, 4294967295, "https://localhost", position, nil, false }, 83 },
+    "http.open_webview", { n = 6, 4294967295, "https://localhost", position, nil, false }, 83 },
   { http.open_webview, { url = "https://localhost", position = position, focus = true, focusable = false },
-    "http.open_webview", { n = 5, 4294967295, "https://localhost", position, true, false }, 83 },
+    "http.open_webview", { n = 6, 4294967295, "https://localhost", position, true, false }, 83 },
+  { http.open_webview, { url = "https://localhost", position = position, close_on_blur = true },
+    "http.open_webview", { n = 6, 4294967295, "https://localhost", position, nil, nil, true }, 83 },
+  { http.open_webview, { url = "https://localhost", position = position, close_on_blur = false },
+    "http.open_webview", { n = 6, 4294967295, "https://localhost", position, nil, nil, false }, 83 },
 }
 
 setup(4294967295, 22)
@@ -174,7 +181,7 @@ request_throws = false
 -- A core policy denial uses the request's error return slot.
 calls, notices, request_throws, request_failure = {}, {}, true, "Webview access denied by host policy"
 eq({ n = 2, [2] = request_failure }, pack(http.open_webview({ url = "https://localhost", position = position })))
-eq({ { "request", 22, "nauvim-plugin/http.open_webview", { n = 5, 4294967295, "https://localhost", position } } }, calls)
+eq({ { "request", 22, "nauvim-plugin/http.open_webview", { n = 6, 4294967295, "https://localhost", position } } }, calls)
 eq({}, notices)
 request_throws = false
 
@@ -233,8 +240,8 @@ local passthrough_cases = {
     "http.serve_file", { n = 5, 4294967295, false, 65536, false, false } },
   { http.get_port, { handle = "not a handle" },
     "http.get_port", { n = 2, 4294967295, "not a handle" } },
-  { http.open_webview, { url = "ftp://localhost", position = invalid_position, focus = "false", focusable = 0 },
-    "http.open_webview", { n = 5, 4294967295, "ftp://localhost", invalid_position, "false", 0 } },
+  { http.open_webview, { url = "ftp://localhost", position = invalid_position, focus = "false", focusable = 0, close_on_blur = "yes" },
+    "http.open_webview", { n = 6, 4294967295, "ftp://localhost", invalid_position, "false", 0, "yes" } },
 }
 response = 84
 for _, case in ipairs(passthrough_cases) do
@@ -278,6 +285,11 @@ eq(nil, filesystem.clear({ handle = 2 }))
 eq(nil, http.clear({ handle = 3 }))
 eq({ n = 1 }, pack(http.focus_webview({ handle = 4 })))
 eq({ n = 1 }, pack(http.focus_webview({ handle = "not a handle" })))
+eq({ n = 1 }, pack(http.navigate_webview({ handle = 4, url = "https://localhost/#next" })))
+eq({ n = 1 }, pack(http.navigate_webview({
+  handle = 4, url = "https://localhost", replace_history = false, focus = true,
+})))
+eq({ n = 1 }, pack(http.navigate_webview({ handle = false, url = 1, replace_history = "yes" })))
 eq(nil, clipboard.copy({ register = "+", text = "first\n日本語\n" }))
 eq({
   { "notification", 22, "nauvim-plugin/local-forward.clear", { n = 2, 4294967295, 1 } },
@@ -285,10 +297,13 @@ eq({
   { "notification", 22, "nauvim-plugin/http.clear", { n = 2, 4294967295, 3 } },
   { "notification", 22, "nauvim-plugin/http.focus_webview", { n = 2, 4294967295, 4 } },
   { "notification", 22, "nauvim-plugin/http.focus_webview", { n = 2, 4294967295, "not a handle" } },
+  { "notification", 22, "nauvim-plugin/http.navigate_webview", { n = 5, 4294967295, 4, "https://localhost/#next" } },
+  { "notification", 22, "nauvim-plugin/http.navigate_webview", { n = 5, 4294967295, 4, "https://localhost", false, true } },
+  { "notification", 22, "nauvim-plugin/http.navigate_webview", { n = 5, 4294967295, false, 1, "yes" } },
   { "notification", 22, "nauvim-plugin/clipboard.copy", { n = 3, 4294967295, "+", "first\n日本語\n" } },
 }, calls)
 notification_throws, notification_failure = true, "stale channel"
-for _, f in ipairs({ forward.clear, filesystem.clear, http.clear, http.focus_webview }) do
+for _, f in ipairs({ forward.clear, filesystem.clear, http.clear, http.focus_webview, http.navigate_webview }) do
   eq(nil, f({ handle = 1 }))
 end
 eq(nil, clipboard.copy({ register = "+", text = "text" }))

@@ -23,9 +23,9 @@ The first suite checks every operation's RPC method and argument order, silent
 calls without a destination, argument forwarding, HTTP protocol selection, exact
 request return counts, error propagation, host paths, clipboard callbacks,
 registration replacement and notification failures. The live suite checks actual
-RPC replies, Webview argument slots and focus notifications, client registration,
-`UILeave`, clipboard copy notifications, empty clipboard-register reads and
-`client.connect()` detachment.
+RPC replies, Webview argument slots, focus and navigation notifications,
+client registration, `UILeave`, clipboard copy notifications, empty
+clipboard-register reads and `client.connect()` detachment.
 
 ## Wire protocol
 
@@ -38,15 +38,16 @@ The Webview and clipboard methods use these argument lists.
 
 | Method | Message kind | Positional arguments |
 | --- | --- | --- |
-| `nauvim-plugin/http.open_webview` | Request | `client_id, url, position, focus, focusable` |
+| `nauvim-plugin/http.open_webview` | Request | `client_id, url, position, focus, focusable, close_on_blur` |
 | `nauvim-plugin/http.focus_webview` | Notification | `client_id, handle` |
+| `nauvim-plugin/http.navigate_webview` | Notification | `client_id, handle, url, replace_history, focus` |
 | `nauvim-plugin/clipboard.copy` | Notification | `client_id, register, text` |
 
-`http.open_webview()` sends all five arguments, with a MessagePack nil for each
-omitted flag. The plugin forwards explicit values, including `false`, to the
-core. The core validates the flags and supplies their defaults. The core also
-looks up the window and handles focus for `http.focus_webview()`. The function
-returns `nil`, and any failure to move focus is reported in the client.
+`http.open_webview()` and `http.navigate_webview()` send a MessagePack nil in
+each omitted flag's slot. The plugin forwards explicit values, including
+`false`, to the core. The core validates the flags and supplies their defaults.
+The core looks up the window for focus and navigation notifications. The
+notification functions return `nil`, and the client reports operation failures.
 
 `register` is `"+"` or `"*"`. `text` is a single UTF-8 string with LF separators
 and an optional trailing LF. The provider's copy callbacks join Neovim's lines
@@ -72,7 +73,7 @@ The core applies the selected host's permissions before performing a governed
 operation or allocating its handle. Omitted permissions grant no access. The
 core returns an RPC error for a denied request, which the plugin exposes as
 `nil, err`. For a denied notification, the core reports a client-side Nauvim
-error and sends no RPC response. See [host-specific policy checks](https://github.com/nauvim/nauvim-spec/blob/v1.0.0/specification.md#host-specific-policy-checks).
+error and sends no RPC response. See [host-specific policy checks](https://github.com/nauvim/nauvim-spec/blob/v1.0.1/specification.md#host-specific-policy-checks).
 
 Destination checks do not query channel liveness. Send failures use ordinary RPC
 handling. Tests use isolated Neovim processes so Lua module caches do not carry
