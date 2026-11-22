@@ -18,13 +18,15 @@ local M = {}
 ---@class NauvimWebviewOptions
 ---@field url string HTTP(S) URL resolved in the client environment.
 ---@field position NauvimWebviewPosition
+---@field focus? boolean Whether to focus the window when it opens. Defaults to true.
+---@field focusable? boolean Whether the window can receive focus. Defaults to true.
 
 local function encode_serve(opts)
   return opts.client_file, opts.client_port, opts.https, opts.http2
 end
 
 local function encode_webview(opts)
-  return opts.url, opts.position
+  return opts.url, opts.position, opts.focus, opts.focusable
 end
 
 local function encode_handle(opts)
@@ -54,6 +56,13 @@ end
 ---@return string? err
 function M.open_webview(opts)
   return rpc.request("http.open_webview", opts, encode_webview)
+end
+
+--- Requests focus for an open, focusable Webview window.
+---@param opts { handle: integer }
+function M.focus_webview(opts)
+  rpc.notify("http.focus_webview", opts, encode_handle)
+  return nil
 end
 
 --- Cancels server startup or closes an existing server or GUI window.

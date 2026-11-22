@@ -59,6 +59,53 @@ local function eq(expected, actual)
     "expected " .. vim.inspect(expected) .. ", got " .. vim.inspect(actual))
 end
 
+local function webview_rpc()
+  local url = "https://example.com/preview"
+  local position = { grid = 1, top = 2, left = 3, height = 4, width = 5 }
+  local open = [[
+    local function reply(...)
+      local ret, err = ...
+      return { select("#", ...), ret or vim.NIL, err or vim.NIL }
+    end
+    return reply(require("nauvim-plugin.http").open_webview(...))
+  ]]
+
+  result = 81
+  for _, flags in ipairs({
+    { vim.NIL, vim.NIL },
+    { false, vim.NIL },
+    { vim.NIL, false },
+    { true, false },
+    { "invalid focus", 0 },
+  }) do
+    local opts = { url = url, position = position }
+    if flags[1] ~= vim.NIL then opts.focus = flags[1] end
+    if flags[2] ~= vim.NIL then opts.focusable = flags[2] end
+
+    messages = {}
+    eq({ 2, 81, vim.NIL }, lua(open, opts))
+    eq({ { "request", "nauvim-plugin/http.open_webview", { 4294967295, url, position, flags[1], flags[2] } } }, messages)
+  end
+
+  messages = {}
+  response_error, result = "host policy denied Webview access", vim.NIL
+  local denied = lua(open, { url = url, position = position })
+  eq(2, denied[1])
+  eq(vim.NIL, denied[2])
+  assert(type(denied[3]) == "string" and denied[3]:find(response_error, 1, true), vim.inspect(denied))
+  eq({ { "request", "nauvim-plugin/http.open_webview", { 4294967295, url, position, vim.NIL, vim.NIL } } }, messages)
+  response_error = vim.NIL
+
+  messages = {}
+  eq({ 1, true }, lua([[
+    local function reply(...)
+      return { select("#", ...), ... == nil }
+    end
+    return reply(require("nauvim-plugin.http").focus_webview({ handle = 81 }))
+  ]]))
+  eq({ { "notification", "nauvim-plugin/http.focus_webview", { 4294967295, 81 } } }, messages)
+end
+
 local function empty_register_reads()
   local before = lua("return vim.api.nvim_exec2('messages', { output = true }).output")
   messages = {}
@@ -106,6 +153,8 @@ local ok, err = xpcall(function()
     return { ret == nil, err == nil }
   ]])
   eq({ true, true }, ret)
+
+  webview_rpc()
 
   -- Neovim supplies the linewise/blockwise trailing empty callback line.
   -- The provider turns those callback lines into exactly one text string.
@@ -163,12 +212,16 @@ local ok, err = xpcall(function()
   empty_register_reads()
   lua('require("nauvim-plugin.client").setup({ client_id = 0 })')
   second_request("nvim_ui_detach")
+  local before = lua("return vim.api.nvim_exec2('messages', { output = true }).output")
   lua([[
     require("nauvim-plugin.local-forward").clear({ handle = 77 })
-    local ret, err = require("nauvim-plugin.http").open_webview(false)
+    local http = require("nauvim-plugin.http")
+    local ret, err = http.open_webview(false)
     assert(ret == nil and err == nil)
+    assert(http.focus_webview(false) == nil)
   ]])
   eq({}, messages)
+  eq(before, lua("return vim.api.nvim_exec2('messages', { output = true }).output"))
 
   second_request("nvim_ui_attach", 80, 24, { rgb = true, ext_linegrid = true })
   lua('require("nauvim-plugin.client").setup({ client_id = 0 })')

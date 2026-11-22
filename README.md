@@ -5,8 +5,8 @@ forwarding, temporary file copies, HTTP previews, clipboard copying and session
 switches. It requires Neovim **v0.12.6**, with no other host dependencies. Use the
 latest versions of both `nauvim-plugin` and `nauvim-core` together.
 
-This implementation targets `nauvim-spec` commit
-[`cc51d1ecc51869d8eafb68f243cf0adff6f390bb`](https://github.com/nauvim/nauvim-spec/tree/cc51d1ecc51869d8eafb68f243cf0adff6f390bb).
+This implementation targets `nauvim-spec` v1.0.0 at commit
+[`a2df4855fb8eac24f4e020a1b647eb233f14adf0`](https://github.com/nauvim/nauvim-spec/tree/a2df4855fb8eac24f4e020a1b647eb233f14adf0).
 
 For releases with Git tags, a change to the referenced `nauvim-spec` commit hash
 requires a minor or major version increase. If the hash stays the same, the patch
@@ -41,8 +41,9 @@ text, so the same configuration can load in a terminal.
 
 ## Use
 
-This example runs inside Neovim with this plugin on its runtime path. With Nauvim
-attached, it forwards an available client port to host port 8080:
+This example forwards an available client port to host port 8080. Run it inside
+Neovim with the plugin on its runtime path and Nauvim attached. The selected
+host's policy must allow the forward.
 
 ```lua
 local forward = require("nauvim-plugin.local-forward")
@@ -71,9 +72,16 @@ end
 All operation functions take one dictionary. Lua requests return two separate
 values, `ret, err`. Check `err == nil` for the absence of a request error. A
 handle identifies asynchronous work that may still be in progress. Notifications,
-including `clear()`, `clipboard.copy()` and `client.connect()`, return `nil`.
+including `clear()`, `http.focus_webview()`, `clipboard.copy()` and
+`client.connect()`, return `nil`.
 `nauvim-core` validates operation arguments and ensures its RPC responses conform
 to the specification.
+
+The selected host needs explicit permissions for file copies, HTTP serving,
+Webview origins, local forwarding and clipboard copies. Omitted permissions
+grant no access to those operations. A denied request returns `nil, err`.
+A denied notification reports an error in the Nauvim client and sends no RPC
+response. See the [host-specific security policies](https://github.com/nauvim/nauvim-spec/blob/v1.0.0/specification.md#host-specific-security-policies).
 
 The root module also exposes each interface:
 
@@ -87,6 +95,6 @@ See [the help reference](doc/nauvim-plugin.txt) (`:help nauvim-plugin`) for
 operations, path rules and destination lifecycle. The available client operations
 depend on the features and policies of `nauvim-core`.
 
-For tests and the clipboard wire protocol, see [CONTRIBUTING.md](CONTRIBUTING.md).
+For tests and wire protocol details, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Licensed under MIT OR Apache-2.0.

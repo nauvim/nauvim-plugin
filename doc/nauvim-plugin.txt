@@ -43,14 +43,24 @@ Test `err == nil` for the absence of a request error.  Request errors are
 returned as nonempty strings.  A `nil` result with no error is valid, such as
 when a pending `get_port()` is cancelled.
 
-Notifications return `nil` and have no RPC response.  `clear()` and
-`clipboard.copy()` ignore send failures.  `client.connect()` displays a send
-failure and keeps the UI attached.
+Notifications return `nil` and have no RPC response.  `clear()`,
+`http.focus_webview()`, and `clipboard.copy()` ignore send failures.
+`client.connect()` displays a send failure and keeps the UI attached.
 
 Without a selected RPC destination, requests, notifications and clipboard copy
 callbacks do nothing.  Requests return `nil, nil`.  Other calls return `nil`.
 Calls do not wait for registration and are not replayed later.  Clipboard
 paste callbacks always supply no text, regardless of the selected destination.
+
+Host permissions				     *nauvim-plugin-host-permissions*
+
+nauvim-core checks the selected host's policy for `filesystem.copy()`,
+`http.serve_file()`, `http.open_webview()`, `local-forward.open_tcp()`,
+`local-forward.open_socket()`, and `clipboard.copy()`.  Omitted permissions
+grant no access to these operations.  A denied request returns `nil, err`.
+A denied notification reports an error in the Nauvim client and sends no RPC
+response.  Handle queries, cleanup, `http.focus_webview()`, and client calls
+follow their usual rules independently of these permissions.
 
 Specification types ~
 
@@ -243,6 +253,15 @@ open_webview({opts})			   *nauvim-plugin.http.open_webview()*
     |nauvim-plugin.http.serve_file()|.  The client displays GUI creation and
     access failures.
 
+    The window receives focus when it opens if both focus flags are `true`.
+    Setting `{focus}` to `true` and `{focusable}` to `false` is valid and
+    skips automatic focus.  The meaning of focus depends on the UI.
+
+    The host policy must permit the URL's origin.  Nauvim also checks the
+    origin of each top-level navigation and redirect.  It blocks any denied
+    navigation and reports an error in the client.  See
+    |nauvim-plugin-host-permissions|.
+
     Parameters: ~
       • {opts}  (`table`) Preview options.
                 • {url} (`string`) HTTP(S) URL.
@@ -252,10 +271,26 @@ open_webview({opts})			   *nauvim-plugin.http.open_webview()*
                   • {left} (`integer`) Offset right from the left, 0 to 65535.
                   • {height} (`integer`) Height, 0 to 65535.
                   • {width} (`integer`) Width, 0 to 65535.
+                • {focus} (`boolean?`) Request focus when the window opens.
+                  Defaults to `true`.
+                • {focusable} (`boolean?`) Allow the window to receive focus.
+                  Defaults to `true`.
 
     Return (multiple): ~
       • (`integer?`) Window handle.
       • (`string?`) Request error.
+
+focus_webview({opts})			  *nauvim-plugin.http.focus_webview()*
+    Sends a notification to focus an open, focusable window created by
+    |nauvim-plugin.http.open_webview()|.  A handle without a matching window
+    has no effect and produces no error.  If moving focus fails, Nauvim
+    reports an error in the client and leaves the window open.
+
+    Parameters: ~
+      • {opts}  (`table`) Table with a `{handle}` field (`integer`).
+
+    Return: ~
+      • (`nil`)
 
 clear({opts})					  *nauvim-plugin.http.clear()*
     Sends a notification to cancel pending server startup or close an existing
