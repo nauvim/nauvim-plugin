@@ -23,8 +23,9 @@ The first suite checks every operation's RPC method and argument order, silent
 calls without a destination, argument forwarding, HTTP protocol selection, exact
 request return counts, error propagation, host paths, clipboard callbacks,
 registration replacement and notification failures. The live suite checks actual
-RPC replies, client registration, `UILeave`, clipboard copy notifications, empty
-clipboard-register reads and `client.connect()` detachment.
+RPC replies, Webview argument slots and focus notifications, client registration,
+`UILeave`, clipboard copy notifications, empty clipboard-register reads and
+`client.connect()` detachment.
 
 ## Wire protocol
 
@@ -33,11 +34,19 @@ Every RPC starts with the stored process client ID. Client paths remain unchange
 for interpretation and confinement in `nauvim-core`. Relative host paths are
 expanded against Neovim's effective current directory before transmission.
 
-The clipboard copy protocol follows specification 11.6:
+The Webview and clipboard methods use these argument lists.
 
 | Method | Message kind | Positional arguments |
 | --- | --- | --- |
+| `nauvim-plugin/http.open_webview` | Request | `client_id, url, position, focus, focusable` |
+| `nauvim-plugin/http.focus_webview` | Notification | `client_id, handle` |
 | `nauvim-plugin/clipboard.copy` | Notification | `client_id, register, text` |
+
+`http.open_webview()` sends all five arguments, with a MessagePack nil for each
+omitted flag. The plugin forwards explicit values, including `false`, to the
+core. The core validates the flags and supplies their defaults. The core also
+looks up the window and handles focus for `http.focus_webview()`. The function
+returns `nil`, and any failure to move focus is reported in the client.
 
 `register` is `"+"` or `"*"`. `text` is a single UTF-8 string with LF separators
 and an optional trailing LF. The provider's copy callbacks join Neovim's lines
@@ -58,6 +67,12 @@ RPC nil sentinel to Lua nil and returns two values for every request. The core
 supplies RPC error text as nonempty UTF-8 without NUL or an initial U+FEFF. If a
 Neovim exception cannot be formatted as a nonempty string, the plugin supplies a
 fallback message.
+
+The core applies the selected host's permissions before performing a governed
+operation or allocating its handle. Omitted permissions grant no access. The
+core returns an RPC error for a denied request, which the plugin exposes as
+`nil, err`. For a denied notification, the core reports a client-side Nauvim
+error and sends no RPC response. See [host-specific policy checks](https://github.com/nauvim/nauvim-spec/blob/v1.0.0/specification.md#host-specific-policy-checks).
 
 Destination checks do not query channel liveness. Send failures use ordinary RPC
 handling. Tests use isolated Neovim processes so Lua module caches do not carry
