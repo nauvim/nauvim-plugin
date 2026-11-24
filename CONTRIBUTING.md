@@ -73,7 +73,7 @@ The core applies the selected host's permissions before performing a governed
 operation or allocating its handle. Omitted permissions grant no access. The
 core returns an RPC error for a denied request, which the plugin exposes as
 `nil, err`. For a denied notification, the core reports a client-side Nauvim
-error and sends no RPC response. See [host-specific policy checks](https://github.com/nauvim/nauvim-spec/blob/v1.1.0/specification.md#host-specific-policy-checks).
+error and sends no RPC response. See [host-specific policy checks](https://github.com/nauvim/nauvim-spec/blob/v1.2.0/specification.md#host-specific-policy-checks).
 
 Destination checks do not query channel liveness. Send failures use ordinary RPC
 handling. Tests use isolated Neovim processes so Lua module caches do not carry
