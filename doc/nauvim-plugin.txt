@@ -55,10 +55,10 @@ paste callbacks always supply no text, regardless of the selected destination.
 
 Host permissions				     *nauvim-plugin-host-permissions*
 
-nauvim-core checks the selected host's policy for `filesystem.copy()`,
+nauvim-core checks the selected host's resolved policy for `filesystem.copy()`,
 `http.serve_file()`, `http.open_webview()`, `local-forward.open_tcp()`,
-`local-forward.open_socket()`, and `clipboard.copy()`.  Omitted permissions
-grant no access to these operations.  A denied request returns `nil, err`.
+`local-forward.open_socket()`, and `clipboard.copy()`.  An omitted permission
+grants no access.  A denied request returns `nil, err`.
 A denied notification reports an error in the Nauvim client and sends no RPC
 response.  Handle queries, cleanup, `http.focus_webview()`, and client calls
 follow their usual rules independently of these permissions.

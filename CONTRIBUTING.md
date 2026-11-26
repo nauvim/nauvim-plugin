@@ -69,11 +69,11 @@ supplies RPC error text as nonempty UTF-8 without NUL or an initial U+FEFF. If a
 Neovim exception cannot be formatted as a nonempty string, the plugin supplies a
 fallback message.
 
-The core applies the selected host's permissions before performing a governed
-operation or allocating its handle. Omitted permissions grant no access. The
-core returns an RPC error for a denied request, which the plugin exposes as
-`nil, err`. For a denied notification, the core reports a client-side Nauvim
-error and sends no RPC response. See [host-specific policy checks](https://github.com/nauvim/nauvim-spec/blob/v1.2.0/specification.md#host-specific-policy-checks).
+The core checks the selected host's resolved policy before performing a
+governed operation or allocating its handle. An omitted permission grants no
+access. The core returns an RPC error for a denied request, which the plugin
+exposes as `nil, err`. For a denied notification, the core reports a client-side
+Nauvim error and sends no RPC response. See [host-specific policy checks](https://github.com/nauvim/nauvim-spec/blob/v1.3.0/specification.md#host-specific-policy-checks).
 
 Destination checks do not query channel liveness. Send failures use ordinary RPC
 handling. Tests use isolated Neovim processes so Lua module caches do not carry
