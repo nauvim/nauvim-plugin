@@ -5,8 +5,8 @@ forwarding, temporary file copies, HTTP previews, clipboard copying and session
 switches. It requires Neovim **v0.12.6**, with no other host dependencies. Use the
 latest versions of both `nauvim-plugin` and `nauvim-core` together.
 
-This implementation targets `nauvim-spec` v1.2.0 at commit
-[`ed92e1d80610fe911074fe32aed6f2b0e510e958`](https://github.com/nauvim/nauvim-spec/tree/ed92e1d80610fe911074fe32aed6f2b0e510e958).
+This implementation targets `nauvim-spec` v1.3.0 at commit
+[`9060ea17efd2c328892255670fd7fab9d074bb7d`](https://github.com/nauvim/nauvim-spec/tree/9060ea17efd2c328892255670fd7fab9d074bb7d).
 
 For releases with Git tags, a change to the referenced `nauvim-spec` commit hash
 requires a minor or major version increase. If the hash stays the same, the patch
@@ -77,11 +77,11 @@ including `clear()`, `http.focus_webview()`, `http.navigate_webview()`,
 `nauvim-core` validates operation arguments and ensures its RPC responses conform
 to the specification.
 
-The selected host needs explicit permissions for file copies, HTTP serving,
-Webview origins, local forwarding and clipboard copies. Omitted permissions
-grant no access to those operations. A denied request returns `nil, err`.
+The selected host's resolved policy must grant permission for file copies,
+HTTP serving, Webview origins, local forwarding and clipboard copies.
+A denied request returns `nil, err`.
 A denied notification reports an error in the Nauvim client and sends no RPC
-response. See the [host-specific security policies](https://github.com/nauvim/nauvim-spec/blob/v1.2.0/specification.md#host-specific-security-policies).
+response. See the [host-specific security policies](https://github.com/nauvim/nauvim-spec/blob/v1.3.0/specification.md#host-specific-security-policies).
 
 The root module also exposes each interface:
 
