@@ -1,5 +1,7 @@
 # nauvim-plugin
 
+<img src="assets/nauvim-logo.svg" alt="Nauvim logo" width="160" height="160">
+
 The host-side Lua interface to Nauvim. Nauvim plugins use it to request client-side
 forwarding, temporary file copies, HTTP previews, clipboard copying and session
 switches. It requires Neovim **v0.12.6**, with no other host dependencies. Use the
